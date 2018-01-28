@@ -1066,6 +1066,7 @@ lonlat2xy_py(PyObject* self, PyObject* args)
     return Py_BuildValue("II", x, y);
 }
 
+
 static PyMethodDef QuadkeyMethods[] =
 {
     /* Conversions from WebMercator coordinates in the range [0,2^31) (uint32 x 2) */
@@ -1106,8 +1107,72 @@ static PyMethodDef QuadkeyMethods[] =
     {NULL, NULL, 0, NULL}
 };
 
+struct module_state {
+    PyObject *error;
+};
+
+#if PY_MAJOR_VERSION >= 3
+#define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
+#else
+#define GETSTATE(m) (&_state)
+static struct module_state _state;
+#endif
+
+#if PY_MAJOR_VERSION >= 3
+
+static int quadkey_traverse(PyObject *m, visitproc visit, void *arg) {
+    Py_VISIT(GETSTATE(m)->error);
+    return 0;
+}
+
+static int quadkey_clear(PyObject *m) {
+    Py_CLEAR(GETSTATE(m)->error);
+    return 0;
+}
+
+
+static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "quadkey",
+        NULL,
+        sizeof(struct module_state),
+        QuadkeyMethods,
+        NULL,
+        quadkey_traverse,
+        quadkey_clear,
+        NULL
+};
+
+#define INITERROR return NULL
+
 PyMODINIT_FUNC
+PyInit_quadkey(void)
+
+#else
+
+#define INITERROR return
+void
 initquadkey(void)
+
+#endif
 {
-     (void) Py_InitModule("quadkey", QuadkeyMethods);
+#if PY_MAJOR_VERSION >= 3
+    PyObject *module = PyModule_Create(&moduledef);
+#else
+    PyObject *module = Py_InitModule("quadkey", QuadkeyMethods);
+#endif
+
+    if (module == NULL)
+        INITERROR;
+    struct module_state *st = GETSTATE(module);
+
+    st->error = PyErr_NewException("quadkey.Error", NULL, NULL);
+    if (st->error == NULL) {
+        Py_DECREF(module);
+        INITERROR;
+    }
+
+#if PY_MAJOR_VERSION >= 3
+    return module;
+#endif
 }
